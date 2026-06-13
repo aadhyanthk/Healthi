@@ -1,5 +1,6 @@
 import { setProfile } from '../services/storage.js';
 import { ConditionRegistry } from '../config/conditions.js';
+import { showToast } from '../utils/toast.js';
 
 export async function render() {
   const conditionsHtml = Object.values(ConditionRegistry).map(cond => `
@@ -40,6 +41,9 @@ export function init() {
   const form = document.getElementById('onboarding-form');
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    const button = form.querySelector('button[type="submit"]');
+    button.disabled = true;
+    button.textContent = 'Saving...';
     const age = document.getElementById('age').value;
     
     const selectedConditions = Array.from(document.querySelectorAll('input[name="condition"]:checked')).map(cb => cb.value);
@@ -50,13 +54,18 @@ export function init() {
       
     const conditions = [...new Set([...selectedConditions, ...otherConditions])];
     
-    await setProfile({
-      age: age ? parseInt(age) : null,
-      conditions,
-      createdAt: new Date().toISOString(),
-      onboardingComplete: true
-    });
-    
-    window.location.hash = '#/dashboard';
+    try {
+      await setProfile({
+        age: age ? parseInt(age) : null,
+        conditions,
+        createdAt: new Date().toISOString(),
+        onboardingComplete: true
+      });
+      window.location.hash = '#/dashboard';
+    } catch (error) {
+      showToast(error.message);
+      button.disabled = false;
+      button.textContent = 'Continue';
+    }
   });
 }

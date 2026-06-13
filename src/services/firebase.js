@@ -11,16 +11,22 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-export const isDemoMode = import.meta.env.MODE === 'test' ||
-  !firebaseConfig.apiKey ||
-  !firebaseConfig.projectId;
+export const isDemoMode = import.meta.env.MODE === 'test';
+export const isFirebaseConfigured = Boolean(
+  firebaseConfig.apiKey &&
+  firebaseConfig.authDomain &&
+  firebaseConfig.projectId &&
+  firebaseConfig.appId
+);
 
-const app = initializeApp(isDemoMode ? {
+const fallbackConfig = {
   apiKey: 'demo-api-key',
   authDomain: 'healthi-demo.firebaseapp.com',
   projectId: 'healthi-demo',
   appId: '1:123:web:demo'
-} : firebaseConfig);
+};
+
+const app = initializeApp(isFirebaseConfigured ? firebaseConfig : fallbackConfig);
 
 export const db = getFirestore(app);
 export const auth = getAuth(app);

@@ -73,6 +73,8 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .role-icon { display: grid; width: 46px; height: 46px; place-items: center; border-radius: 14px; background: var(--mint); color: var(--green); font-weight: 800; }
 .role-icon.doctor { background: #e8eff5; color: var(--blue); }
 .privacy-note { margin: 22px 0 0; color: var(--muted); text-align: center; font-size: .8rem; }
+.auth-config-message { margin-top: 20px; padding: 17px; background: #fff3dc; color: #7a531a; border-radius: 15px; }
+.auth-config-message p { margin: 5px 0 0; font-size: .9rem; }
 .centered-state { display: grid; min-height: 100vh; place-items: center; padding: 24px; }
 
 .app-layout { min-height: 100vh; }
@@ -190,6 +192,71 @@ label { font-weight: 700; }
 .clinical-card p { margin-bottom: 5px; color: var(--muted); font-size: .86rem; }
 .action-form { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--line); }
 
+.doctor-access { display: grid; grid-template-columns: minmax(0,1fr) minmax(360px,.8fr); gap: 42px; align-items: end; margin-bottom: 26px; padding: clamp(24px,4vw,38px); background: var(--green-dark); color: white; border-radius: 26px; }
+.doctor-access h1 { margin-bottom: 8px; font-size: clamp(2rem,4vw,3.2rem); }
+.doctor-access .muted { color: #c9ddd5; }
+.patient-access-form { padding: 20px; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.16); border-radius: 18px; }
+.patient-access-row { display: grid; grid-template-columns: 1fr auto; gap: 9px; margin-top: 8px; }
+.form-message { min-height: 24px; margin: 9px 0 0; font-size: .84rem; }
+.error-message { color: #ffd0c5; }
+.doctor-workspace { min-height: 300px; }
+.doctor-empty-state { display: grid; min-height: 310px; place-items: center; align-content: center; padding: 35px; text-align: center; background: white; border: 1px solid var(--line); border-radius: 22px; }
+.doctor-empty-state h2 { margin: 16px 0 7px; }
+.loading-spinner { width: 42px; height: 42px; border: 4px solid var(--mint); border-top-color: var(--green); border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.patient-overview-card { display: grid; grid-template-columns: minmax(250px,.8fr) minmax(0,1.2fr); gap: 25px; align-items: center; margin-bottom: 22px; padding: 24px; background: white; border: 1px solid var(--line); border-radius: 22px; }
+.patient-overview-card h2 { margin-bottom: 4px; }
+.patient-uid { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; }
+.patient-facts { display: grid; grid-template-columns: .55fr .7fr 1.6fr; gap: 12px; margin: 0; }
+.patient-facts div { min-height: 82px; padding: 15px; background: var(--cream); border-radius: 15px; }
+.patient-facts dt { color: var(--muted); font-size: .75rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.patient-facts dd { margin: 6px 0 0; font-weight: 700; }
+.doctor-dashboard-grid { display: grid; min-width: 0; grid-template-columns: minmax(0,1.55fr) minmax(300px,.75fr); gap: 22px; align-items: start; }
+.doctor-side-column { display: grid; min-width: 0; gap: 22px; }
+.doctor-section { min-width: 0; padding: 24px; background: white; border: 1px solid var(--line); border-radius: 22px; }
+.doctor-section h2 { margin-bottom: 14px; }
+.section-note { margin-top: -7px; font-size: .84rem; }
+.ledger-filters { display: grid; grid-template-columns: 1fr 1fr auto auto; gap: 10px; align-items: end; margin-bottom: 22px; padding: 15px; background: var(--cream); border-radius: 15px; }
+.ledger-filters label { font-size: .8rem; }
+.ledger-filters .btn { min-height: 47px; }
+.ledger-day + .ledger-day { margin-top: 25px; }
+.ledger-day > h3 { margin-bottom: 10px; color: var(--green); font-size: 1rem; }
+.ledger-entry { padding: 17px 0 17px 18px; border-left: 3px solid var(--mint-strong); }
+.ledger-entry + .ledger-entry { border-top: 1px solid var(--line); }
+.ledger-entry h4 { margin: 0 0 5px; font: 700 1rem 'Manrope'; }
+.ledger-entry p { margin-bottom: 9px; color: var(--muted); font-size: .9rem; }
+.insights-list { display: grid; gap: 10px; }
+.stored-insight { padding: 16px; background: var(--sage); border-radius: 15px; }
+.stored-insight p { margin-bottom: 8px; font-weight: 650; }
+.stored-insight time { color: var(--muted); font-size: .75rem; }
+.recommendation-form { display: grid; gap: 14px; }
+.recommendation-form label .muted { font-weight: 500; }
+.recommendations-section { margin-top: 22px; }
+.recommendation-item { display: flex; align-items: flex-start; justify-content: space-between; gap: 22px; padding: 16px 0; border-top: 1px solid var(--line); }
+.recommendation-item:first-child { border-top: 0; }
+.recommendation-item p { margin-bottom: 3px; }
+.recommendation-item span, .recommendation-item time { color: var(--muted); font-size: .8rem; }
+.recommendation-item time { flex: 0 0 auto; }
+.empty-list { padding: 20px; color: var(--muted); text-align: center; background: var(--cream); border-radius: 15px; }
+.empty-list p { margin: 0; }
+.doctor-report { margin-top: 24px; }
+.doctor-report[hidden] { display: none; }
+.report-actions { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 14px; padding: 20px 24px; background: white; border: 1px solid var(--line); border-radius: 20px; }
+.report-actions h2 { margin: 0; }
+.report-paper { max-width: 900px; margin: 0 auto; padding: 46px; background: white; border: 1px solid var(--line); box-shadow: var(--shadow); }
+.report-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding-bottom: 22px; border-bottom: 2px solid var(--ink); }
+.report-header > div { display: flex; align-items: center; gap: 12px; }
+.report-header strong { display: block; font: 800 1.2rem 'Manrope'; }
+.report-header p, .report-header > span { margin: 2px 0 0; color: var(--muted); font-size: .75rem; }
+.report-section { padding: 24px 0; border-bottom: 1px solid var(--line); }
+.report-section:last-child { border-bottom: 0; }
+.report-section h2, .report-section h3 { margin-bottom: 13px; }
+.report-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 20px; }
+.report-facts p { margin: 0; }
+.report-row { display: grid; grid-template-columns: 120px 1fr; gap: 18px; padding: 10px 0; border-top: 1px solid var(--line); }
+.report-row time { color: var(--muted); font-size: .82rem; }
+.report-row p { margin: 3px 0 0; color: var(--muted); }
+
 .bottom-nav { position: fixed; z-index: 50; right: 0; bottom: 0; left: 0; display: flex; justify-content: space-around; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: white; border-top: 1px solid var(--line); }
 .nav-item { display: grid; min-width: 62px; place-items: center; color: var(--muted); text-decoration: none; font-size: .72rem; font-weight: 700; }
 .nav-item.active { color: var(--green); }
@@ -202,6 +269,9 @@ label { font-weight: 700; }
   .care-grid { grid-template-columns: 1fr 1fr; }
   .appointment-card { grid-column: 1/-1; }
   .doctor-grid { grid-template-columns: 1fr; }
+  .doctor-dashboard-grid { grid-template-columns: 1fr; }
+  .doctor-access { grid-template-columns: 1fr; align-items: start; }
+  .patient-overview-card { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 760px) {
@@ -231,6 +301,11 @@ label { font-weight: 700; }
   .form-grid, .clinical-grid, .doctor-overview { grid-template-columns: 1fr; }
   .doctor-shell { padding: 24px 17px 40px; }
   .doctor-header { align-items: flex-start; }
+  .doctor-header-actions > div { display: none; }
+  .patient-facts { grid-template-columns: 1fr; }
+  .ledger-filters { grid-template-columns: 1fr 1fr; }
+  .report-paper { padding: 25px; }
+  .report-header, .report-actions { align-items: flex-start; flex-direction: column; }
 }
 
 @media (max-width: 480px) {
@@ -241,11 +316,19 @@ label { font-weight: 700; }
   .timeline-item { grid-template-columns: 48px 1fr; gap: 12px; }
   .timeline-date { width: 48px; height: 56px; }
   .timeline::before { left: 24px; }
+  .patient-access-row, .ledger-filters { grid-template-columns: 1fr; }
+  .doctor-section .section-heading { align-items: flex-start; flex-direction: column; }
+  .doctor-section .section-heading .btn { width: 100%; }
+  .recommendation-item { flex-direction: column; gap: 5px; }
 }
 
 @media print {
   .sidebar, .app-nav, .bottom-nav, .no-print, .icon-button { display: none !important; }
   .main-content { margin: 0; padding: 0; }
-  body { background: white; }
+  body { padding: 0; background: white; color: #111; }
   .card { box-shadow: none; }
+  .doctor-shell { padding: 0; }
+  .doctor-report, .doctor-report[hidden] { display: block !important; margin: 0; }
+  .report-paper { max-width: none; padding: 0; border: 0; box-shadow: none; }
+  .report-section { break-inside: avoid; }
 }

@@ -66,6 +66,7 @@ export function init() {
       return;
     }
     submit.disabled = true;
+    submit.textContent = 'Saving...';
     loading.style.display = 'block';
     try {
       await addLog({ raw_text: text, parsed_data: await parseWellnessLog(text) });
@@ -74,6 +75,7 @@ export function init() {
     } catch (error) {
       showToast(error.message);
       submit.disabled = false;
+      submit.textContent = 'Understand and save';
       loading.style.display = 'none';
     }
   });

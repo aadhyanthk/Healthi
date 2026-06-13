@@ -3,14 +3,18 @@ import {
   addAppointment,
   addLog,
   addMetricLog,
+  addDoctorRecommendation,
   addVisit,
   clearAllData,
   getAppointments,
   getLogs,
   getMetricLogs,
+  getDoctorRecommendations,
+  getPatientInsights,
   getProfile,
   getVisits,
   setProfile,
+  saveInsight,
   startDemo
 } from '../src/services/storage.js';
 
@@ -49,5 +53,18 @@ describe('Healthi storage service', () => {
     await addVisit({ patientId: 'demo-patient', diagnosis: 'Routine follow-up', recommendations: 'Continue walking.' });
     expect((await getAppointments()).at(-1).status).toBe('scheduled');
     expect((await getVisits()).at(-1).diagnosis).toBe('Routine follow-up');
+  });
+
+  it('stores generated insights and doctor recommendations', async () => {
+    await saveInsight('Sleep and headache patterns were observed.');
+    expect((await getPatientInsights('demo-patient'))[0].text).toBe('Sleep and headache patterns were observed.');
+
+    startDemo('doctor');
+    await addDoctorRecommendation({
+      patientId: 'demo-patient',
+      text: 'Monitor sleep quality.',
+      doctorName: 'Dr. Test'
+    });
+    expect((await getDoctorRecommendations('demo-patient'))[0].text).toBe('Monitor sleep quality.');
   });
 });

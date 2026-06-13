@@ -37,6 +37,7 @@ function seedStore() {
         role: 'patient',
         name: 'Maya Rao',
         age: 68,
+        gender: 'Female',
         email: 'maya@example.com',
         patientCode: 'HLT729',
         conditions: ['hypertension', 'diabetes', 'temperature', 'oxygen_level', 'body_weight'],
@@ -126,6 +127,30 @@ function seedStore() {
         recommendations: 'Continue morning walks and record blood pressure three times weekly.',
         doctorNotes: 'Review again in two weeks.'
       }
+    ],
+    insights: [
+      {
+        id: 'insight-1',
+        patientId: 'demo-patient',
+        text: 'Headaches appear more frequently after nights with less than six hours of sleep.',
+        createdAt: daysAgo(0, 10)
+      },
+      {
+        id: 'insight-2',
+        patientId: 'demo-patient',
+        text: 'Energy levels were better on days that included a walk.',
+        createdAt: daysAgo(2, 20)
+      }
+    ],
+    recommendations: [
+      {
+        id: 'recommendation-1',
+        patientId: 'demo-patient',
+        doctorId: 'demo-doctor',
+        doctorName: 'Dr. Arjun Mehta',
+        text: 'Continue tracking sleep quality and morning headaches.',
+        createdAt: daysAgo(1, 11)
+      }
     ]
   };
 }
@@ -165,16 +190,31 @@ export async function getProfile() {
   }
   const user = auth.currentUser;
   if (!user) return null;
-  const snap = await getDoc(doc(db, 'users', user.uid));
-  if (!snap.exists()) return null;
-  const profile = snap.data();
-  if (profile.role === 'patient' && profile.patientCode) {
-    await setDoc(doc(db, 'patientCodes', profile.patientCode), {
-      patientId: user.uid,
-      createdAt: profile.createdAt || serverTimestamp()
-    }, { merge: true });
+  try {
+    const snap = await getDoc(doc(db, 'users', user.uid));
+    if (!snap.exists()) return null;
+    const profile = snap.data();
+    if (!profile || typeof profile !== 'object') {
+      console.error('Invalid profile data from Firestore:', profile);
+      return null;
+    }
+    if (profile.role === 'patient' && profile.patientCode) {
+      await setDoc(doc(db, 'patientCodes', profile.patientCode), {
+        patientId: user.uid,
+        createdAt: profile.createdAt || serverTimestamp()
+      }, { merge: true });
+    }
+    if (profile.role === 'patient') {
+      await setDoc(doc(db, 'patientUids', user.uid), {
+        patientId: user.uid,
+        createdAt: profile.createdAt || serverTimestamp()
+      }, { merge: true });
+    }
+    return profile;
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    return null;
   }
-  return profile;
 }
 
 export async function setProfile(data) {
@@ -196,6 +236,12 @@ export async function setProfile(data) {
       createdAt: serverTimestamp()
     });
   }
+  if (profile.role === 'patient') {
+    await setDoc(doc(db, 'patientUids', user.uid), {
+      patientId: user.uid,
+      createdAt: serverTimestamp()
+    }, { merge: true });
+  }
 }
 
 export async function createUserProfile(data) {
@@ -214,6 +260,12 @@ export async function createUserProfile(data) {
   await setDoc(doc(db, 'users', user.uid), profile);
   if (profile.role === 'patient' && profile.patientCode) {
     await setDoc(doc(db, 'patientCodes', profile.patientCode), {
+      patientId: user.uid,
+      createdAt: serverTimestamp()
+    });
+  }
+  if (profile.role === 'patient') {
+    await setDoc(doc(db, 'patientUids', user.uid), {
       patientId: user.uid,
       createdAt: serverTimestamp()
     });
@@ -343,9 +395,11 @@ export async function addVisit(data) {
   }
   const doctor = auth.currentUser;
   if (!doctor) throw new Error('Not authenticated');
+  const doctorProfile = await getProfile();
   await addDoc(collection(db, 'doctorVisits'), {
     ...data,
     doctorId: doctor.uid,
+    doctorName: doctorProfile?.name || '',
     date: new Date().toISOString(),
     createdAt: serverTimestamp()
   });
@@ -371,7 +425,7 @@ export async function deleteAccount() {
   const profile = profileSnap.data();
 
   if (profile?.role === 'patient') {
-    const ownedCollections = ['healthEntries', 'metricLogs', 'appointments', 'doctorVisits'];
+    const ownedCollections = ['healthEntries', 'metricLogs', 'appointments', 'doctorVisits', 'aiInsights'];
     for (const collectionName of ownedCollections) {
       const ownedQuery = query(collection(db, collectionName), where('patientId', '==', user.uid));
       const ownedDocs = await getDocs(ownedQuery);
@@ -388,6 +442,7 @@ export async function deleteAccount() {
     if (profile.patientCode) {
       await deleteDoc(doc(db, 'patientCodes', profile.patientCode));
     }
+    await deleteDoc(doc(db, 'patientUids', user.uid));
   } else if (profile?.role === 'doctor') {
     const assignmentsQuery = query(
       collection(db, 'doctorAssignments'),
@@ -419,6 +474,38 @@ export async function linkPatientToDoctor(patientCode) {
   });
   const patient = await getDoc(doc(db, 'users', patientId));
   return { id: patient.id, ...patient.data() };
+}
+
+export async function accessPatientByUid(patientUid) {
+  const normalizedUid = patientUid.trim();
+  if (!normalizedUid || normalizedUid.length > 128 || normalizedUid.includes('/')) {
+    throw new Error('Enter a valid patient UID.');
+  }
+
+  if (isDemoMode) {
+    const patient = readStore().profiles.patient;
+    if (normalizedUid !== patient.id) throw new Error('No patient was found with that UID.');
+    return { ...patient };
+  }
+
+  const doctor = auth.currentUser;
+  if (!doctor) throw new Error('Not authenticated');
+  const uidSnap = await getDoc(doc(db, 'patientUids', normalizedUid));
+  if (!uidSnap.exists()) throw new Error('No patient was found with that UID.');
+
+  await setDoc(doc(db, 'doctorAssignments', `${doctor.uid}_${normalizedUid}`), {
+    doctorId: doctor.uid,
+    patientId: normalizedUid,
+    accessMethod: 'uid',
+    createdAt: serverTimestamp()
+  });
+
+  const patient = await getPatientProfile(normalizedUid);
+  if (!patient || patient.role !== 'patient') {
+    await deleteDoc(doc(db, 'doctorAssignments', `${doctor.uid}_${normalizedUid}`));
+    throw new Error('No patient was found with that UID.');
+  }
+  return patient;
 }
 
 export async function getDoctorPatients() {
@@ -455,6 +542,91 @@ export async function getPatientMetricLogs(patientUid) {
   return snapshotToArray(await getDocs(q)).sort((a, b) => new Date(a.date) - new Date(b.date));
 }
 
+export async function saveInsight(text) {
+  const normalizedText = text?.trim();
+  if (!normalizedText) return;
+
+  if (isDemoMode) {
+    const store = readStore();
+    store.insights ||= [];
+    const duplicate = store.insights.some((item) => item.patientId === 'demo-patient' && item.text === normalizedText);
+    if (!duplicate) {
+      store.insights.push({
+        id: crypto.randomUUID(),
+        patientId: 'demo-patient',
+        text: normalizedText,
+        createdAt: new Date().toISOString()
+      });
+      writeStore(store);
+    }
+    return;
+  }
+
+  const user = auth.currentUser;
+  if (!user) throw new Error('Not authenticated');
+  await addDoc(collection(db, 'aiInsights'), {
+    patientId: user.uid,
+    text: normalizedText,
+    createdAt: serverTimestamp()
+  });
+}
+
+export async function getPatientInsights(patientUid) {
+  if (isDemoMode) {
+    return (readStore().insights || [])
+      .filter((item) => item.patientId === 'demo-patient')
+      .sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
+  }
+  const q = query(collection(db, 'aiInsights'), where('patientId', '==', patientUid));
+  return snapshotToArray(await getDocs(q)).sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
+}
+
+export async function addDoctorRecommendation({ patientId, text, doctorName }) {
+  const normalizedText = text?.trim();
+  if (!normalizedText) throw new Error('Enter a recommendation before saving.');
+
+  if (isDemoMode) {
+    const store = readStore();
+    store.recommendations ||= [];
+    store.recommendations.push({
+      id: crypto.randomUUID(),
+      patientId,
+      doctorId: 'demo-doctor',
+      doctorName: doctorName || store.profiles.doctor.name,
+      text: normalizedText,
+      createdAt: new Date().toISOString()
+    });
+    writeStore(store);
+    return;
+  }
+
+  const doctor = auth.currentUser;
+  if (!doctor) throw new Error('Not authenticated');
+  await addDoc(collection(db, 'doctorRecommendations'), {
+    patientId,
+    doctorId: doctor.uid,
+    doctorName: doctorName?.trim() || '',
+    text: normalizedText,
+    createdAt: serverTimestamp()
+  });
+}
+
+export async function getDoctorRecommendations(patientUid) {
+  if (isDemoMode) {
+    return (readStore().recommendations || [])
+      .filter((item) => item.patientId === 'demo-patient')
+      .sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
+  }
+  const q = query(collection(db, 'doctorRecommendations'), where('patientId', '==', patientUid));
+  return snapshotToArray(await getDocs(q)).sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
+}
+
 function snapshotToArray(snapshot) {
   return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+}
+
+function toMillis(value) {
+  if (value?.toMillis) return value.toMillis();
+  const millis = new Date(value || 0).getTime();
+  return Number.isNaN(millis) ? 0 : millis;
 }

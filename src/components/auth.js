@@ -1,99 +1,80 @@
-import { auth, isDemoMode } from '../services/firebase.js';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../services/firebase.js';
-import { createUserProfile, startDemo } from '../services/storage.js';
+import { auth, db, isFirebaseConfigured } from '../services/firebase.js';
+import { createUserProfile } from '../services/storage.js';
 import { showToast } from '../utils/toast.js';
 
 export async function render() {
-  if (isDemoMode) {
-    return `
-      <main class="auth-shell">
-        <section class="auth-story">
-          <a class="brand" href="#/auth" aria-label="Healthi home">
-            <span class="brand-mark">H</span><span>Healthi</span>
-          </a>
-          <div class="auth-copy">
-            <p class="eyebrow light">Your health, understood</p>
-            <h1>A calmer way to keep your care connected.</h1>
-            <p>Healthi turns everyday notes into a clear health timeline that patients, families, and doctors can understand together.</p>
-            <div class="trust-row">
-              <span>Private by design</span><span>AI-assisted</span><span>Accessible</span>
-            </div>
-          </div>
-        </section>
-        <section class="auth-panel">
-          <div class="auth-card">
-            <div class="demo-badge">Interactive demo</div>
-            <h2>Choose your view</h2>
-            <p class="muted">Explore the complete care loop with realistic sample information.</p>
-            <button class="role-choice" data-role="patient">
-              <span class="role-icon">P</span>
-              <span><strong>Continue as Maya</strong><small>Log health, view insights, manage care</small></span>
-              <span aria-hidden="true">→</span>
-            </button>
-            <button class="role-choice" data-role="doctor">
-              <span class="role-icon doctor">D</span>
-              <span><strong>Continue as Dr. Mehta</strong><small>Review patients and create care plans</small></span>
-              <span aria-hidden="true">→</span>
-            </button>
-            <p class="privacy-note">Demo data stays in this browser and can be reset anytime.</p>
-          </div>
-        </section>
-      </main>`;
-  }
-
   const user = auth.currentUser;
-  let chooseRole = false;
-  if (user) chooseRole = !(await getDoc(doc(db, 'users', user.uid))).exists();
+  const chooseRole = user
+    ? !(await getDoc(doc(db, 'users', user.uid))).exists()
+    : false;
 
   return `
     <main class="centered-state">
       <div class="auth-card">
         <a class="brand centered-brand" href="#/auth"><span class="brand-mark">H</span><span>Healthi</span></a>
-        <h1>${chooseRole ? 'How will you use Healthi?' : 'Welcome back'}</h1>
+        <h1>${chooseRole ? 'How will you use Healthi?' : 'Welcome to Healthi'}</h1>
         ${chooseRole ? `
+          <p class="muted">Your account is ready. Choose the role that matches how you will use Healthi.</p>
           <form id="role-form">
             <label class="role-choice"><input type="radio" name="role" value="patient" checked><span><strong>Patient</strong><small>Track and share my health</small></span></label>
             <label class="role-choice"><input type="radio" name="role" value="doctor"><span><strong>Doctor</strong><small>Support my patients</small></span></label>
             <button class="btn btn-primary btn-block" type="submit">Complete setup</button>
-          </form>` : `
-          <p class="muted">Sign in securely to open your health ledger.</p>
-          <button id="google-btn" class="btn btn-secondary btn-block">Continue with Google</button>`}
+          </form>` : isFirebaseConfigured ? `
+          <p class="muted">Sign in or create an account first. New users choose Patient or Doctor after authentication.</p>
+          <button id="google-btn" class="btn btn-secondary btn-block">Sign in with Google</button>` : `
+          <div class="auth-config-message" role="status">
+            <strong>Authentication is not configured.</strong>
+            <p>Add the Firebase environment variables to enable account sign-in and creation.</p>
+          </div>`}
       </div>
     </main>`;
 }
 
 export function init() {
-  document.querySelectorAll('[data-role]').forEach((button) => {
-    button.addEventListener('click', () => {
-      startDemo(button.dataset.role);
-      window.dispatchEvent(new Event('healthi-session-change'));
-    });
-  });
-
-  document.getElementById('google-btn')?.addEventListener('click', async () => {
+  document.getElementById('google-btn')?.addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    button.textContent = 'Signing in...';
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
       await signInWithPopup(auth, provider);
     } catch (error) {
       showToast(error.message);
+      button.disabled = false;
+      button.textContent = 'Sign in with Google';
     }
   });
 
   document.getElementById('role-form')?.addEventListener('submit', async (event) => {
     event.preventDefault();
+    const submit = event.currentTarget.querySelector('button[type="submit"]');
     const role = new FormData(event.currentTarget).get('role');
     const user = auth.currentUser;
-    await createUserProfile({
-      name: user.displayName,
-      email: user.email,
-      role,
-      patientCode: role === 'patient' ? createPatientCode() : null,
-      onboardingComplete: role === 'doctor',
-    });
-    window.location.hash = role === 'doctor' ? '#/doctor-dashboard' : '#/onboarding';
+
+    if (!user) {
+      showToast('Please sign in before choosing a role.');
+      return;
+    }
+
+    submit.disabled = true;
+    submit.textContent = 'Saving...';
+    try {
+      await createUserProfile({
+        name: user.displayName,
+        email: user.email,
+        role,
+        patientCode: role === 'patient' ? createPatientCode() : null,
+        onboardingComplete: role === 'doctor'
+      });
+      window.location.hash = role === 'doctor' ? '#/doctor-dashboard' : '#/onboarding';
+    } catch (error) {
+      showToast(error.message);
+      submit.disabled = false;
+      submit.textContent = 'Complete setup';
+    }
   });
 }
 

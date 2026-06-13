@@ -1,7 +1,7 @@
 import './style.css';
-import { auth, isDemoMode } from './services/firebase.js';
+import { auth, isDemoMode, isFirebaseConfigured } from './services/firebase.js';
 import { onAuthStateChanged } from 'firebase/auth';
-import { getDemoRole, getProfile } from './services/storage.js';
+import { getProfile } from './services/storage.js';
 
 const routes = {
   dashboard: () => import('./components/dashboard.js'),
@@ -17,7 +17,7 @@ const routes = {
 export async function router() {
   const app = document.getElementById('app');
   let route = window.location.hash.replace('#/', '') || 'dashboard';
-  const signedIn = isDemoMode ? Boolean(getDemoRole()) : Boolean(auth.currentUser);
+  const signedIn = Boolean(auth.currentUser);
 
   if (!signedIn && route !== 'auth') {
     window.location.hash = '#/auth';
@@ -69,7 +69,7 @@ export async function router() {
 window.addEventListener('hashchange', router);
 window.addEventListener('healthi-session-change', router);
 
-if (isDemoMode) {
+if (isDemoMode || !isFirebaseConfigured) {
   router();
 } else {
   onAuthStateChanged(auth, router);

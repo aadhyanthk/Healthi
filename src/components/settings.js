@@ -1,5 +1,6 @@
 import { clearAllData, getProfile, setProfile } from '../services/storage.js';
 import { ConditionRegistry, getConditionConfig } from '../config/conditions.js';
+import { showToast } from '../utils/toast.js';
 
 export async function render() {
   const profile = await getProfile();
@@ -72,8 +73,16 @@ export function init() {
   const logoutBtn = document.getElementById('logout-btn');
   if (logoutBtn) {
     logoutBtn.addEventListener('click', async () => {
-      await import('../services/storage.js').then(m => m.clearAllData());
-      window.location.hash = '#/auth';
+      logoutBtn.disabled = true;
+      logoutBtn.textContent = 'Logging out...';
+      try {
+        await clearAllData();
+        window.location.hash = '#/auth';
+      } catch (error) {
+        showToast(error.message);
+        logoutBtn.disabled = false;
+        logoutBtn.textContent = 'Log Out';
+      }
     });
   }
 
@@ -82,6 +91,8 @@ export function init() {
     deleteBtn.addEventListener('click', async () => {
       const confirmDelete = confirm("Are you sure you want to PERMANENTLY delete your account and all data? This cannot be undone.");
       if (confirmDelete) {
+        deleteBtn.disabled = true;
+        deleteBtn.textContent = 'Deleting...';
         try {
           await import('../services/storage.js').then(m => m.deleteAccount());
           window.location.hash = '#/auth';
@@ -93,6 +104,8 @@ export function init() {
           } else {
              alert('Failed to delete account: ' + err.message);
           }
+          deleteBtn.disabled = false;
+          deleteBtn.textContent = 'Delete Account & Data';
         }
       }
     });
@@ -102,15 +115,32 @@ export function init() {
   if (form) {
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const profile = await getProfile();
-      
-      const selected = Array.from(document.querySelectorAll('input[name="setting-condition"]:checked')).map(cb => cb.value);
-      const other = document.getElementById('other-setting').value.split(',').map(c => c.trim()).filter(c => c);
-      const newConditions = [...new Set([...selected, ...other])];
-      
-      await setProfile({ ...profile, conditions: newConditions });
-      
-      import('../utils/toast.js').then(({ showToast }) => showToast("Conditions updated!"));
+      const button = form.querySelector('button[type="submit"]');
+      if (!button) {
+        console.error('Submit button not found');
+        return;
+      }
+      button.disabled = true;
+      button.textContent = 'Saving...';
+      try {
+        const profile = await getProfile();
+        if (!profile) {
+          showToast('Profile not found. Please try again.');
+          return;
+        }
+        const selected = Array.from(document.querySelectorAll('input[name="setting-condition"]:checked')).map(cb => cb.value);
+        const otherInput = document.getElementById('other-setting');
+        const other = otherInput ? otherInput.value.split(',').map(c => c.trim()).filter(c => c) : [];
+        const newConditions = [...new Set([...selected, ...other])];
+
+        await setProfile({ ...profile, conditions: newConditions });
+        showToast('Conditions updated!');
+      } catch (error) {
+        showToast(error.message);
+      } finally {
+        button.disabled = false;
+        button.textContent = 'Save Conditions';
+      }
     });
   }
 }

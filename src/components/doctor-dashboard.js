@@ -1,9 +1,9 @@
 import {
-  addAppointment,
-  addVisit,
+  accessPatientByUid,
+  addDoctorRecommendation,
   clearAllData,
-  getAppointments,
-  getDoctorPatients,
+  getDoctorRecommendations,
+  getPatientInsights,
   getPatientLogs,
   getPatientMetricLogs,
   getPatientProfile,
@@ -14,53 +14,50 @@ import {
 } from '../services/storage.js';
 import { getConditionConfig } from '../config/conditions.js';
 import { showToast } from '../utils/toast.js';
+import { safeParseDate, compareDates, formatDate } from '../utils/date.js';
 
-let selectedPatientId = 'demo-patient';
+let doctorProfile = null;
+let selectedPatient = null;
+let patientData = null;
 
 export async function render() {
-  const [patients, doctor] = await Promise.all([getDoctorPatients(), getProfile()]);
-  const patient = patients[0];
-  selectedPatientId = patient?.id || 'demo-patient';
+  doctorProfile = await getProfile();
 
   return `
     <main class="doctor-shell">
-      <header class="doctor-header">
+      <header class="doctor-header no-print">
         <a class="brand" href="#/doctor-dashboard"><span class="brand-mark">H</span><span>Healthi Clinical</span></a>
         <div class="doctor-header-actions">
-          <div><strong>${doctor?.name || 'Doctor'}</strong><div class="muted">${doctor?.specialty || 'Healthcare professional'}</div></div>
-          <button id="logout-btn" class="btn btn-secondary">Sign out</button>
+          <div><strong>${escapeHtml(doctorProfile?.name || 'Doctor')}</strong><div class="muted">${escapeHtml(doctorProfile?.specialty || 'Healthcare professional')}</div></div>
+          <button id="logout-btn" class="btn btn-secondary" type="button">Sign out</button>
         </div>
       </header>
 
-      <div class="topbar">
-        <div><p class="eyebrow">Clinical workspace</p><h1>Good morning, Doctor.</h1><p class="muted">Review changes, update care plans, and keep patients moving forward.</p></div>
-      </div>
-
-      <section class="doctor-overview">
-        <article class="overview-card"><span>Active patients</span><strong>${patients.length}</strong></article>
-        <article class="overview-card"><span>Appointments this week</span><strong>3</strong></article>
-        <article class="overview-card"><span>New health entries</span><strong>2</strong></article>
+      <section class="doctor-access no-print" aria-labelledby="doctor-access-title">
+        <div>
+          <p class="eyebrow">Patient access</p>
+          <h1 id="doctor-access-title">Open a patient record</h1>
+          <p class="muted">Enter the patient's unique UID. Health records are read-only in this workspace.</p>
+        </div>
+        <form id="patient-access-form" class="patient-access-form" novalidate>
+          <label for="patient-uid">Patient UID</label>
+          <div class="patient-access-row">
+            <input id="patient-uid" name="patientUid" autocomplete="off" maxlength="128" placeholder="Enter patient UID" required>
+            <button id="patient-access-submit" class="btn btn-primary" type="submit">View record</button>
+          </div>
+          <p id="patient-access-help" class="form-message muted">Ask the patient to share the UID shown in their account.</p>
+        </form>
       </section>
 
-      <section class="doctor-grid">
-        <aside class="patient-panel">
-          <p class="eyebrow">My patients</p><h2>Patient list</h2>
-          <div class="patient-search">
-            <input id="patient-code" maxlength="6" aria-label="Patient access code" placeholder="6-digit code">
-            <button id="link-patient-btn" class="btn btn-primary">Add</button>
-          </div>
-          <div class="patient-list">
-            ${patients.map((item, index) => `
-              <button class="patient-item ${index === 0 ? 'active' : ''}" data-id="${item.id}">
-                <strong>${item.name || `Patient ${item.patientCode}`}</strong>
-                <small>${item.age || '--'} years · ${(item.conditions || []).join(', ')}</small>
-              </button>`).join('') || '<p class="muted">Use a patient code to get started.</p>'}
-          </div>
-        </aside>
-        <section class="patient-detail" id="patient-detail">
-          ${patient ? await renderPatient(patient.id) : '<div class="centered-state"><p class="muted">Select a patient to view their ledger.</p></div>'}
-        </section>
+      <section id="doctor-workspace" class="doctor-workspace no-print" aria-live="polite">
+        <div class="doctor-empty-state">
+          <span class="patient-avatar">ID</span>
+          <h2>No patient selected</h2>
+          <p class="muted">Enter a patient UID above to view their overview, ledger, insights, and recommendations.</p>
+        </div>
       </section>
+
+      <section id="doctor-report" class="doctor-report" hidden></section>
     </main>`;
 }
 
@@ -91,17 +88,32 @@ async function renderPatient(patientId) {
       </div>`;
   }
 
-  return `
-    <div class="patient-detail-header">
-      <div class="patient-identity"><span class="patient-avatar">${profile.name?.split(' ').map((word) => word[0]).join('') || 'P'}</span><div><p class="eyebrow">Patient ${profile.patientCode}</p><h2>${profile.name || 'Patient profile'}</h2><p class="muted">${profile.age} years · ${(profile.conditions || []).join(', ')}</p></div></div>
-      <span class="status-pill" style="background:var(--sage);color:var(--green)"><i></i> Active care</span>
-    </div>
+  submit.disabled = true;
+  submit.textContent = 'Loading...';
+  setWorkspaceLoading();
 
-    <div class="patient-tabs" role="tablist" aria-label="Patient detail sections">
-      <button class="active" type="button" role="tab" aria-selected="true" data-tab="overview">Overview</button>
-      <button type="button" role="tab" aria-selected="false" data-tab="timeline">Timeline</button>
-      <button type="button" role="tab" aria-selected="false" data-tab="care-plan">Care plan</button>
-    </div>
+  try {
+    selectedPatient = await accessPatientByUid(patientUid);
+    const [logs, metrics, insights, recommendations] = await Promise.all([
+      getPatientLogs(selectedPatient.id),
+      getPatientMetricLogs(selectedPatient.id),
+      getPatientInsights(selectedPatient.id),
+      getDoctorRecommendations(selectedPatient.id)
+    ]);
+    patientData = { logs, metrics, insights, recommendations };
+    message.textContent = `Viewing ${selectedPatient.name || 'patient'} (${selectedPatient.id}).`;
+    renderWorkspace();
+  } catch (error) {
+    selectedPatient = null;
+    patientData = null;
+    message.textContent = friendlyAccessError(error);
+    message.className = 'form-message error-message';
+    setWorkspaceError(message.textContent);
+  } finally {
+    submit.disabled = false;
+    submit.textContent = 'View record';
+  }
+}
 
     <section data-tab-panel="overview">
       <div class="clinical-grid">
@@ -148,16 +160,37 @@ async function renderPatient(patientId) {
         </div>
       </form>
 
-      <div class="action-form">
-        <p class="eyebrow">Visit history</p>
-        ${renderVisitHistory(visits)}
-      </div>
-      <div class="action-form">
-        <p class="eyebrow">Appointments</p>
-        ${renderAppointmentList(appointments)}
-      </div>
+      <aside class="doctor-side-column">
+        <section class="doctor-section">
+          <p class="eyebrow">AI insights</p>
+          <h2>Recorded observations</h2>
+          <p class="muted section-note">These insights were generated in the patient experience. No analysis is run here.</p>
+          <div class="insights-list">${renderInsights(patientData.insights)}</div>
+        </section>
+
+        <section class="doctor-section">
+          <p class="eyebrow">Doctor recommendation</p>
+          <h2>Add a note</h2>
+          <form id="recommendation-form" class="recommendation-form">
+            <div class="field">
+              <label for="recommendation-text">Recommendation</label>
+              <textarea id="recommendation-text" name="text" rows="4" maxlength="1000" placeholder="e.g. Monitor sleep quality." required></textarea>
+            </div>
+            <div class="field">
+              <label for="doctor-name">Doctor name <span class="muted">(optional)</span></label>
+              <input id="doctor-name" name="doctorName" maxlength="100" value="${escapeHtml(doctorProfile?.name || '')}">
+            </div>
+            <button id="save-recommendation" class="btn btn-primary" type="submit">Save recommendation</button>
+          </form>
+        </section>
+      </aside>
+    </div>
+
+    <section class="doctor-section recommendations-section">
+      <p class="eyebrow">History</p>
+      <h2>Previous recommendations</h2>
+      <div id="recommendations-history">${renderRecommendations(patientData.recommendations)}</div>
     </section>`;
-}
 
 function renderReadingForms(profile) {
   const requiredConditions = ['hypertension', 'diabetes', 'temperature', 'oxygen_level', 'body_weight'];
@@ -183,95 +216,139 @@ function renderAppointmentList(appointments) {
   const sortedAppointments = [...appointments].sort((a, b) => new Date(a.scheduledDate) - new Date(b.scheduledDate));
   if (!sortedAppointments.length) return '<p class="muted">No appointments scheduled yet.</p>';
 
-  return sortedAppointments.map((appointment) => `
-    <article class="timeline-body" style="margin-top:12px">
-      <div class="timeline-meta"><span class="severity low">${appointment.status || 'scheduled'}</span><time>${new Date(appointment.scheduledDate).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</time></div>
-      <h3>${appointment.reason || 'Clinical follow-up'}</h3>
-      <p>${appointment.notes || 'No appointment notes.'}</p>
-    </article>`).join('');
+function renderPatientOverview(profile) {
+  const conditions = profile.conditions?.length ? profile.conditions.map(formatLabel).join(', ') : 'None recorded';
+  return `
+    <section class="patient-overview-card">
+      <div class="patient-identity">
+        <span class="patient-avatar">${initials(profile.name)}</span>
+        <div><p class="eyebrow">Patient overview</p><h2>${escapeHtml(profile.name || 'Unnamed patient')}</h2><p class="muted">UID: <span class="patient-uid">${escapeHtml(profile.id)}</span></p></div>
+      </div>
+      <dl class="patient-facts">
+        <div><dt>Age</dt><dd>${escapeHtml(profile.age ?? 'Not provided')}</dd></div>
+        <div><dt>Gender</dt><dd>${escapeHtml(profile.gender || 'Not provided')}</dd></div>
+        <div><dt>Pre-existing conditions</dt><dd>${escapeHtml(conditions)}</dd></div>
+      </dl>
+    </section>`;
 }
 
-function renderTimeline(logs, visits) {
-  const events = [
+function buildLedgerEntries(logs, metrics) {
+  return [
     ...logs.map((log) => ({
+      id: log.id,
       type: 'Health log',
       date: log.date,
       title: log.parsed_data?.summary || 'Patient health entry',
-      body: log.raw_text || '',
+      description: log.raw_text || '',
       tags: [
         ...(log.parsed_data?.symptoms || []),
-        log.parsed_data?.sleep ? `Sleep: ${log.parsed_data.sleep}` : ''
+        log.parsed_data?.sleep ? `Sleep: ${log.parsed_data.sleep}` : '',
+        log.parsed_data?.severity ? `Severity: ${log.parsed_data.severity}` : ''
       ].filter(Boolean)
     })),
-    ...visits.map((visit) => ({
-      type: 'Visit',
-      date: visit.date,
-      title: visit.diagnosis || 'Clinical visit',
-      body: visit.recommendations || visit.doctorNotes || '',
-      tags: [
-        ...(visit.prescriptions || []).map((item) => `${item.medicine} ${item.dosage || ''}`.trim()),
-        ...(visit.testsOrdered || []).map((item) => `Test: ${item.name}`)
-      ]
+    ...metrics.map((metric) => ({
+      id: metric.id,
+      type: 'Reading',
+      date: metric.date,
+      title: `${formatLabel(metric.condition)} reading`,
+      description: Object.entries(metric.metrics || {})
+        .map(([key, value]) => `${formatLabel(key)}: ${value}`)
+        .join(', '),
+      tags: []
     }))
-  ].sort((a, b) => new Date(b.date) - new Date(a.date));
+  ].sort((a, b) => dateMillis(b.date) - dateMillis(a.date));
+}
 
-  if (!events.length) return '<p class="muted">No timeline entries yet.</p>';
+function renderLedger(entries) {
+  if (!entries.length) return '<div class="empty-list"><p>No health entries were found for this date range.</p></div>';
 
-  return events.map((event) => `
-    <article class="timeline-body" style="margin-top:12px">
-      <div class="timeline-meta"><span class="severity low">${event.type}</span><time>${new Date(event.date).toLocaleDateString()}</time></div>
-      <h3>${event.title}</h3>
-      <p>${event.body}</p>
-      <div class="tag-row">${event.tags.map((tag) => `<span>${tag}</span>`).join('')}</div>
+  const groups = entries.reduce((result, entry) => {
+    const day = formatDate(entry.date, { year: 'numeric', month: 'long', day: 'numeric' });
+    (result[day] ||= []).push(entry);
+    return result;
+  }, {});
+
+  return Object.entries(groups).map(([day, dayEntries]) => `
+    <section class="ledger-day">
+      <h3>${escapeHtml(day)}</h3>
+      ${dayEntries.map((entry) => `
+        <article class="ledger-entry">
+          <div class="timeline-meta">
+            <span class="severity low">${escapeHtml(entry.type)}</span>
+            <time>${escapeHtml(formatDate(entry.date, { hour: 'numeric', minute: '2-digit' }))}</time>
+          </div>
+          <h4>${escapeHtml(entry.title)}</h4>
+          ${entry.description ? `<p>${escapeHtml(entry.description)}</p>` : ''}
+          ${entry.tags.length ? `<div class="tag-row">${entry.tags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join('')}</div>` : ''}
+        </article>`).join('')}
+    </section>`).join('');
+}
+
+function renderInsights(insights) {
+  if (!insights.length) return '<div class="empty-list"><p>No saved AI insights are available.</p></div>';
+  return insights.map((insight) => `
+    <article class="stored-insight">
+      <p>${escapeHtml(insight.text)}</p>
+      <time>${escapeHtml(formatDate(insight.createdAt, { year: 'numeric', month: 'short', day: 'numeric' }))}</time>
     </article>`).join('');
 }
 
-function renderVisitHistory(visits) {
-  const sortedVisits = [...visits].sort((a, b) => new Date(b.date) - new Date(a.date));
-  if (!sortedVisits.length) return '<p class="muted">No care plans have been saved yet.</p>';
-
-  return sortedVisits.map((visit) => `
-    <article class="timeline-body" style="margin-top:12px">
-      <div class="timeline-meta"><span class="severity low">Visit</span><time>${new Date(visit.date).toLocaleDateString()}</time></div>
-      <h3>${visit.diagnosis}</h3><p>${visit.recommendations}</p>
-      <div class="tag-row">${(visit.prescriptions || []).map((item) => `<span>${item.medicine} ${item.dosage || ''}</span>`).join('')}${(visit.testsOrdered || []).map((item) => `<span>Test: ${item.name}</span>`).join('')}</div>
+function renderRecommendations(recommendations) {
+  if (!recommendations.length) return '<div class="empty-list"><p>No doctor recommendations have been added.</p></div>';
+  return recommendations.map((recommendation) => `
+    <article class="recommendation-item">
+      <div>
+        <p>${escapeHtml(recommendation.text)}</p>
+        <span>${escapeHtml(recommendation.doctorName || 'Doctor')}</span>
+      </div>
+      <time>${escapeHtml(formatDate(recommendation.createdAt, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }))}</time>
     </article>`).join('');
 }
 
-export function init() {
-  document.getElementById('logout-btn')?.addEventListener('click', async () => {
-    await clearAllData();
-    window.location.hash = '#/auth';
-    window.dispatchEvent(new Event('healthi-session-change'));
-  });
-
-  document.getElementById('link-patient-btn')?.addEventListener('click', async () => {
-    const input = document.getElementById('patient-code');
-    try {
-      await linkPatientToDoctor(input.value.trim().toUpperCase());
-      showToast('Patient linked successfully.');
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
-    } catch (error) {
-      showToast(error.message);
+function bindWorkspaceEvents(allEntries) {
+  document.getElementById('ledger-filter-form')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const values = Object.fromEntries(new FormData(event.currentTarget));
+    const from = values.from ? new Date(`${values.from}T00:00:00`) : null;
+    const to = values.to ? new Date(`${values.to}T23:59:59.999`) : null;
+    if (from && to && from > to) {
+      showToast('The start date must be before the end date.');
+      return;
     }
-  });
-
-  document.querySelectorAll('.patient-item').forEach((button) => {
-    button.addEventListener('click', async () => {
-      selectedPatientId = button.dataset.id;
-      document.querySelectorAll('.patient-item').forEach((item) => item.classList.toggle('active', item === button));
-      document.getElementById('patient-detail').innerHTML = await renderPatient(selectedPatientId);
-      bindPatientDetail();
+    const filtered = allEntries.filter((entry) => {
+      const date = new Date(entry.date);
+      return (!from || date >= from) && (!to || date <= to);
     });
+    document.getElementById('ledger-results').innerHTML = renderLedger(filtered);
   });
 
-  bindPatientDetail();
+  document.getElementById('clear-ledger-filter')?.addEventListener('click', () => {
+    document.getElementById('ledger-filter-form').reset();
+    document.getElementById('ledger-results').innerHTML = renderLedger(allEntries);
+  });
+
+  document.getElementById('recommendation-form')?.addEventListener('submit', handleRecommendation);
+
+  document.getElementById('report-toggle-btn')?.addEventListener('click', () => {
+    const report = document.getElementById('doctor-report');
+    report.hidden = !report.hidden;
+    if (!report.hidden) report.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  document.getElementById('print-report-btn')?.addEventListener('click', () => window.print());
+  document.getElementById('close-report-btn')?.addEventListener('click', () => {
+    document.getElementById('doctor-report').hidden = true;
+  });
 }
 
-function bindPatientDetail() {
-  bindPatientTabs();
-  bindClinicalForm();
-}
+async function handleRecommendation(event) {
+  event.preventDefault();
+  const button = document.getElementById('save-recommendation');
+  const data = Object.fromEntries(new FormData(event.currentTarget));
+  if (!data.text.trim()) {
+    showToast('Enter a recommendation before saving.');
+    return;
+  }
 
 
 
@@ -289,7 +366,22 @@ function bindPatientTabs() {
         panel.hidden = panel.dataset.tabPanel !== tab;
       });
     });
-  });
+    patientData.recommendations = await getDoctorRecommendations(selectedPatient.id);
+    document.getElementById('recommendations-history').innerHTML = renderRecommendations(patientData.recommendations);
+    event.currentTarget.reset();
+    document.getElementById('doctor-name').value = doctorProfile?.name || '';
+    renderReport();
+    document.getElementById('print-report-btn')?.addEventListener('click', () => window.print());
+    document.getElementById('close-report-btn')?.addEventListener('click', () => {
+      document.getElementById('doctor-report').hidden = true;
+    });
+    showToast('Recommendation saved.');
+  } catch (error) {
+    showToast(error.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Save recommendation';
+  }
 }
 
 function bindClinicalForm() {
