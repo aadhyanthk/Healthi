@@ -206,7 +206,7 @@ function renderReadingForms(profile) {
     condition.metrics.map((metric) => `
       <div class="field">
         <label for="${condition.id}-${metric.id}">${metric.label}</label>
-        <input id="${condition.id}-${metric.id}" name="metric_${condition.id}_${metric.id}" type="${metric.type}" min="0" placeholder="${metric.placeholder}">
+        <input id="${condition.id}-${metric.id}" name="metric-${condition.id}-${metric.id}" type="${metric.type}" min="0" placeholder="${metric.placeholder}">
       </div>
     `)
   ).join('');
@@ -392,11 +392,10 @@ function bindClinicalForm() {
 
       const metricGroups = {};
       for (const key in data) {
-        if (key.startsWith('metric_') && data[key] !== '') {
-          const parts = key.split('_');
-          const metricId = parts.pop();
-          parts.shift(); // remove 'metric'
-          const conditionId = parts.join('_');
+        if (key.startsWith('metric-') && data[key] !== '') {
+          const parts = key.split('-');
+          const conditionId = parts[1];
+          const metricId = parts[2];
           
           if (!metricGroups[conditionId]) metricGroups[conditionId] = {};
           metricGroups[conditionId][metricId] = Number(data[key]);

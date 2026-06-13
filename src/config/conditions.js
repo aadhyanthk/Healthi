@@ -89,9 +89,9 @@ export const ConditionRegistry = {
     metrics: [
       {
         id: 'weight',
-        label: 'Weight (lbs)',
+        label: 'Weight (kg)',
         type: 'number',
-        placeholder: 'e.g., 150',
+        placeholder: 'e.g., 70',
         chartConfig: {
           label: 'Weight Trend',
           color: '#10b981', // emerald-500

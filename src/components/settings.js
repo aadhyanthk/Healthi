@@ -30,9 +30,17 @@ export async function render() {
   return `
     <div style="margin-top: 20px;">
       <h1>Settings</h1>
-      <p style="color: var(--text-secondary); margin-bottom: 24px;">Manage your preferences and data.</p>
+      <p class="muted" style="margin-bottom: 24px;">Manage your preferences and data.</p>
       
-      ${patientCodeHtml}
+      ${profile?.role === 'patient' ? `
+        <div class="card" style="margin-bottom: 16px;">
+          <h3 style="margin-bottom: 12px;">Your Patient Code</h3>
+          <p class="muted" style="margin-bottom: 16px;">Share this code with your doctor so they can view your health data.</p>
+          <div style="background: var(--sage); padding: 16px; border-radius: 14px; text-align: center; font-size: 1.5rem; font-weight: 700; letter-spacing: 4px; color: var(--ink);">
+            ${profile.patientCode || 'N/A'}
+          </div>
+        </div>
+      ` : ''}
       
       <div class="card" style="margin-bottom: 16px;">
         <h3 style="margin-bottom: 16px;">Manage Conditions</h3>
@@ -40,29 +48,25 @@ export async function render() {
           <div style="margin-bottom: 16px;">
             ${registryHtml}
           </div>
-          <label for="other-setting" style="display: block; font-weight: 500; margin-bottom: 8px;">Other Conditions</label>
-          <input type="text" id="other-setting" value="${otherConds.join(', ')}" placeholder="e.g., Asthma" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: var(--radius-button); font-size: 1rem; margin-bottom: 16px;">
-          <button type="submit" class="btn-primary" style="width: 100%;">Save Conditions</button>
+          <label for="other-setting" style="display: block; font-weight: 700; margin-bottom: 8px;">Other Conditions</label>
+          <input type="text" id="other-setting" value="${otherConds.join(', ')}" placeholder="e.g., Asthma" style="margin-bottom: 16px;">
+          <button type="submit" class="btn btn-primary btn-block">Save Conditions</button>
         </form>
       </div>
 
       <div class="card" style="margin-bottom: 16px;">
         <h3 style="margin-bottom: 12px;">Account Access</h3>
-        <p style="color: var(--text-secondary); margin-bottom: 16px;">Sign out of your account on this device.</p>
-        <button id="logout-btn" class="btn-primary" style="background-color: var(--slate-700); width: 100%;">
-          Log Out
-        </button>
+        <p class="muted" style="margin-bottom: 16px;">Sign out of your account on this device.</p>
+        <button id="logout-btn" class="btn btn-secondary btn-block">Log Out</button>
       </div>
 
       <div class="card">
-        <h3 style="margin-bottom: 12px; color: var(--amber-700);">Danger Zone</h3>
-        <p style="color: var(--text-secondary); margin-bottom: 16px;">This will permanently delete your profile, health logs, and account. This cannot be undone.</p>
-        <button id="delete-btn" class="btn-primary" style="background-color: var(--amber-700); width: 100%;">
-          Delete Account & Data
-        </button>
+        <h3 style="margin-bottom: 12px; color: var(--danger);">Danger Zone</h3>
+        <p class="muted" style="margin-bottom: 16px;">This will permanently delete your profile, health logs, and account. This cannot be undone.</p>
+        <button id="delete-btn" class="btn btn-secondary btn-block" style="color: var(--danger); border-color: #fce7e2;">Delete Account & Data</button>
       </div>
       
-      <a href="#/dashboard" style="display: block; text-align: center; margin-top: 24px; color: var(--blue-600); text-decoration: none; font-weight: 600;">
+      <a href="#/dashboard" style="display: block; text-align: center; margin-top: 24px; font-weight: 700;">
         &larr; Back to Dashboard
       </a>
     </div>

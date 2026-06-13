@@ -119,7 +119,7 @@ export async function render() {
             <article class="metric-card">
               <div class="metric-label"><span class="metric-dot" style="background-color: #10b981"></span>Body Weight</div>
               <strong>${latestWeight?.metrics.weight || '--'}</strong>
-              <span>lbs</span><small class="trend">Steady</small>
+              <span>kg</span><small class="trend">Steady</small>
             </article>
             <article class="metric-card">
               <div class="metric-label"><span class="metric-dot" style="background-color: #8b5cf6"></span>Oxygen Level</div>
