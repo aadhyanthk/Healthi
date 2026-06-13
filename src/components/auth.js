@@ -38,7 +38,9 @@ export function init() {
     button.disabled = true;
     button.textContent = 'Signing in...';
     try {
-      await signInWithPopup(auth, new GoogleAuthProvider());
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      await signInWithPopup(auth, provider);
     } catch (error) {
       showToast(error.message);
       button.disabled = false;
